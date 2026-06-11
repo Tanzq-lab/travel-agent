@@ -1,0 +1,2 @@
+"""Content collection adapters."""
+

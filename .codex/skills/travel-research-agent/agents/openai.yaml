@@ -1,0 +1,5 @@
+interface:
+  display_name: "Travel Research Agent"
+  short_description: "Collect travel evidence and write grounded reports"
+  default_prompt: "Use $travel-research-agent to research whether I should visit a destination and generate an evidence-grounded travel report."
+

@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.local
+data/*.sqlite3
+data/vector_store/*.jsonl
+data/media_crawler_runs/
+external/MediaCrawler/
+
