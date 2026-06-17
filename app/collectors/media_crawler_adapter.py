@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
+import signal
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from hashlib import sha1
@@ -70,13 +73,10 @@ class MediaCrawlerAdapter(SourceCollector):
             run_dir = self._run_dir(platform, query)
             run_dir.mkdir(parents=True, exist_ok=True)
             cmd = self.build_command(platform=platform, query=query, limit=limit, run_dir=run_dir)
-            completed = subprocess.run(
+            completed = _run_command(
                 cmd,
                 cwd=str(root),
-                text=True,
-                capture_output=True,
-                timeout=self.config.timeout_seconds,
-                check=False,
+                timeout_seconds=self.config.timeout_seconds,
             )
             if completed.returncode != 0:
                 self.errors.append(
@@ -287,7 +287,60 @@ def _first_int(item: dict[str, Any], keys: list[str]) -> int | None:
     return None
 
 
+def _run_command(cmd: list[str], *, cwd: str, timeout_seconds: int) -> subprocess.CompletedProcess[str]:
+    popen_kwargs: dict[str, Any] = {}
+    if sys.platform == "win32":
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        popen_kwargs["start_new_session"] = True
+
+    process = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        **popen_kwargs,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        _terminate_process_tree(process)
+        try:
+            stdout, stderr = process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = "", ""
+        timeout_message = f"MediaCrawler timed out after {timeout_seconds} seconds and was terminated."
+        stderr = "\n".join(part for part in [timeout_message, stderr] if part)
+        return subprocess.CompletedProcess(cmd, 124, stdout, stderr)
+
+    return subprocess.CompletedProcess(cmd, process.returncode, stdout, stderr)
+
+
+def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
+
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return
+
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+
+
 def _trim_error(text: str, limit: int = 500) -> str:
     stripped = " ".join(text.split())
     return stripped[:limit] if stripped else "unknown MediaCrawler error"
-
