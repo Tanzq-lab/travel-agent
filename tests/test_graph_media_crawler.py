@@ -18,6 +18,7 @@ def make_settings(tmp_path: Path, media_root: Path) -> Settings:
         media_crawler_sleep_seconds=0,
         media_crawler_rate_limit_per_minute=1000,
         media_crawler_timeout_seconds=20,
+        media_crawler_require_initialized=False,
     )
 
 
@@ -93,4 +94,3 @@ def test_graph_reports_collection_errors_when_media_crawler_missing(tmp_path: Pa
     assert response.collection_summary.total_docs == 0
     assert response.collection_errors
     assert response.judgement.final_judgement == "资料不足，暂不能判断"
-

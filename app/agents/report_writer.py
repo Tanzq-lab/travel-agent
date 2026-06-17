@@ -20,6 +20,15 @@ class ReportWriter:
     ) -> str:
         """Build the final Chinese Markdown report."""
 
+        if ReportWriter._media_crawler_without_sources(collection_summary):
+            return self._write_collection_status(
+                intent,
+                raw_docs,
+                collection_summary=collection_summary,
+                collection_errors=collection_errors or [],
+                llm_mode=llm_mode,
+            )
+
         if judgement.final_judgement == "资料不足，暂不能判断":
             return self._write_insufficient(
                 intent,
@@ -120,6 +129,50 @@ class ReportWriter:
             *self._collection_error_lines(collection_errors or []),
         ]
         return "\n".join(lines).strip() + "\n"
+
+    @staticmethod
+    def _media_crawler_without_sources(collection_summary: CollectionSummary | None) -> bool:
+        return (
+            collection_summary is not None
+            and collection_summary.mode == "media_crawler"
+            and collection_summary.total_docs == 0
+        )
+
+    @staticmethod
+    def _write_collection_status(
+        intent: UserIntent,
+        raw_docs: list[RawDocument],
+        collection_summary: CollectionSummary | None = None,
+        collection_errors: list[CollectionError] | None = None,
+        llm_mode: str = "fallback",
+    ) -> str:
+        return "\n".join(
+            [
+                f"# {intent.destination} MediaCrawler 采集状态",
+                "",
+                "## 状态",
+                "",
+                "MediaCrawler 未完成有效资料采集，本次不生成旅游结论、评分、行程或推荐。",
+                "",
+                "资料模式："
+                f"{collection_summary.mode if collection_summary else 'unknown'}；"
+                f"LLM 模式：{llm_mode}。"
+                + (" 未配置 OPENAI_API_KEY，证据抽取使用规则 fallback。" if llm_mode == "fallback" else ""),
+                "",
+                "## 资料来源摘要",
+                "",
+                *ReportWriter._source_summary(raw_docs),
+                "",
+                "## 采集错误",
+                "",
+                *ReportWriter._collection_error_lines(collection_errors or []),
+                "",
+                "## 下一步",
+                "",
+                "- 先运行 `scripts\\initialize_media_crawler.ps1` 完成安装、CDP 浏览器启动、平台登录和小流量采集检查。",
+                "- 初始化成功并产生可用 MediaCrawler source documents 后，再运行研究命令。",
+            ]
+        )
 
     @staticmethod
     def _write_insufficient(

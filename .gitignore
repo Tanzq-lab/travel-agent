@@ -6,5 +6,5 @@ __pycache__/
 data/*.sqlite3
 data/vector_store/*.jsonl
 data/media_crawler_runs/
+data/media_crawler_init/
 external/MediaCrawler/
-

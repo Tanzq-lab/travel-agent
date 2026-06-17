@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     media_crawler_rate_limit_per_minute: int = 10
     media_crawler_timeout_seconds: int = 120
     media_crawler_runs_path: Path = Path("data/media_crawler_runs")
+    media_crawler_require_initialized: bool = True
+    media_crawler_init_status_path: Path = Path("data/media_crawler_init/status.json")
 
     max_queries: int = 14
     min_document_length: int = 20

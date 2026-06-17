@@ -152,6 +152,8 @@ class TravelWorkflow:
                 sleep_seconds=self.settings.media_crawler_sleep_seconds,
                 rate_limit_per_minute=self.settings.media_crawler_rate_limit_per_minute,
                 timeout_seconds=self.settings.media_crawler_timeout_seconds,
+                require_initialized=self.settings.media_crawler_require_initialized,
+                init_status_path=self.settings.media_crawler_init_status_path,
             ),
             platforms=request.platforms,
             request_id=request_id,

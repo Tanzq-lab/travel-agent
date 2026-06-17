@@ -4,6 +4,7 @@ import json
 import os
 import shlex
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -38,6 +39,8 @@ class MediaCrawlerRunConfig:
     sleep_seconds: float = 1.0
     rate_limit_per_minute: int = 10
     timeout_seconds: int = 120
+    require_initialized: bool = False
+    init_status_path: Path | None = Path("data/media_crawler_init/status.json")
 
 
 @dataclass
@@ -49,6 +52,7 @@ class MediaCrawlerAdapter(SourceCollector):
     request_id: str
     errors: list[CollectionError] = field(default_factory=list)
     _query_counter: int = 0
+    _init_error_reported: bool = False
 
     def search(self, query: str, limit: int) -> list[RawDocument]:
         """Search all configured platforms through MediaCrawler for one query."""
@@ -62,6 +66,13 @@ class MediaCrawlerAdapter(SourceCollector):
                     error=f"MediaCrawler root not found: {root}. Run scripts/setup_media_crawler.ps1 first.",
                 )
             )
+            return []
+
+        init_error = self._initialization_error()
+        if init_error:
+            if not self._init_error_reported:
+                self.errors.append(CollectionError(platform=None, query=query, error=init_error))
+                self._init_error_reported = True
             return []
 
         self._query_counter += 1
@@ -147,6 +158,55 @@ class MediaCrawlerAdapter(SourceCollector):
     def _run_dir(self, platform: str, query: str) -> Path:
         query_hash = sha1(query.encode("utf-8")).hexdigest()[:10]
         return self.run_root() / platform / f"{self._query_counter:03d}-{query_hash}"
+
+    def _initialization_error(self) -> str | None:
+        if not self.config.require_initialized:
+            return None
+
+        status_path = self.config.init_status_path
+        if status_path is None:
+            return None
+
+        if not status_path.exists():
+            return (
+                "MediaCrawler is not initialized. Run "
+                "scripts\\initialize_media_crawler.ps1 before media_crawler research."
+            )
+
+        try:
+            status = json.loads(status_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return f"MediaCrawler initialization status is unreadable: {status_path} ({exc})."
+
+        if not status.get("initialized"):
+            return (
+                "MediaCrawler initialization is incomplete. Run "
+                "scripts\\initialize_media_crawler.ps1 and complete platform login before research."
+            )
+
+        ready_platforms = {str(item).lower() for item in status.get("ready_platforms", [])}
+        requested_platforms = set(self._normalized_platforms())
+        missing_platforms = sorted(requested_platforms - ready_platforms)
+        if missing_platforms:
+            return (
+                "MediaCrawler is not initialized for requested platform(s): "
+                f"{', '.join(missing_platforms)}. Run scripts\\initialize_media_crawler.ps1 "
+                f"-Platforms {','.join(missing_platforms)} first."
+            )
+
+        cdp_port = status.get("cdp_port")
+        if cdp_port is not None:
+            try:
+                port = int(cdp_port)
+            except (TypeError, ValueError):
+                return f"MediaCrawler initialization status has an invalid cdp_port: {cdp_port!r}."
+            if not _is_tcp_port_open("127.0.0.1", port):
+                return (
+                    f"MediaCrawler CDP browser is not running on port {port}. Run "
+                    "scripts\\initialize_media_crawler.ps1 again before research."
+                )
+
+        return None
 
 
 class MediaCrawlerOutputParser:
@@ -339,6 +399,14 @@ def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
         process.kill()
+
+
+def _is_tcp_port_open(host: str, port: int) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=1.0):
+            return True
+    except OSError:
+        return False
 
 
 def _trim_error(text: str, limit: int = 500) -> str:

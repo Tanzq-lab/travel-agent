@@ -19,28 +19,32 @@ Use `--collection-mode media_crawler` by default for research tasks. Use `--coll
 
 Hard rule: if MediaCrawler research did not actually run and collect usable source documents, do not give a travel conclusion, score, itinerary, suitability judgement, or recommendations. Do not substitute model knowledge, generic travel advice, official website browsing, or `mock` data for the MediaCrawler evidence corpus.
 
+Initialization rule: installation, CDP browser startup, platform login, QR-code login, cookie preparation, and platform readiness checks belong to the initialization flow, not the research flow. Do not start ad-hoc login or platform setup while answering a research request.
+
 ## Workflow
 
 1. Work from the repository root.
 2. Use real MediaCrawler collection unless the user explicitly asks for a fallback/demo mode.
-3. Check that `external\MediaCrawler` exists. If it does not, run:
+3. Check that MediaCrawler has already been initialized. Initialization is done with:
 
 ```powershell
-.\scripts\setup_media_crawler.ps1
+.\scripts\initialize_media_crawler.ps1
 ```
 
-4. Run `scripts/run_travel_research.py` with the user's query.
-5. Inspect the output metadata:
+   This script installs MediaCrawler if needed, starts the local CDP browser, asks the user to complete any platform login, runs small readiness checks, and writes `data/media_crawler_init/status.json`.
+4. If initialization status is missing, incomplete, stale, or does not cover the requested platforms, stop and tell the user to run the initialization script. Do not proceed to research collection.
+5. Run `scripts/run_travel_research.py` with the user's query.
+6. Inspect the output metadata:
    - `collection_mode`
    - `llm_mode`
    - `collection_errors`
    - `collection_summary`
-6. Treat the generated report as valid only when all of these are true:
+7. Treat the generated report as valid only when all of these are true:
    - `collection_summary.mode` is `media_crawler`
    - `collection_summary.total_docs` is greater than `0`
    - recommendations are backed by MediaCrawler-collected evidence
    - the report says it is based on collected sources
-7. If the validity checks fail, stop at a collection status report. Surface the metadata and errors, then state that no travel conclusion can be given until MediaCrawler collection succeeds.
+8. If the validity checks fail, stop at a collection status report. Surface the metadata and errors, then state that no travel conclusion can be given until MediaCrawler collection succeeds.
 
 ## Output Expectations
 
@@ -55,6 +59,8 @@ Only surface final judgement and score when MediaCrawler collection succeeded an
 If `llm_mode=fallback`, explicitly say evidence extraction used rule-based fallback because `OPENAI_API_KEY` was not configured.
 
 If collection errors are present, do not hide them. If usable MediaCrawler documents were still collected, mention that the report may be based on partial sources. If no usable MediaCrawler documents were collected, do not provide conclusions or recommendations.
+
+If the error says MediaCrawler is not initialized, the correct next step is `.\scripts\initialize_media_crawler.ps1`; do not run platform login inside the research task.
 
 ## Safety Rules
 
