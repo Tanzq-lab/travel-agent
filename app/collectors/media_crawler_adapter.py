@@ -81,7 +81,7 @@ class MediaCrawlerAdapter(SourceCollector):
 
         for platform in self._normalized_platforms():
             started_at = time.monotonic()
-            run_dir = self._run_dir(platform, query)
+            run_dir = self._run_dir(platform, query).resolve()
             run_dir.mkdir(parents=True, exist_ok=True)
             cmd = self.build_command(platform=platform, query=query, limit=limit, run_dir=run_dir)
             completed = _run_command(
@@ -133,7 +133,7 @@ class MediaCrawlerAdapter(SourceCollector):
             "--save_data_option",
             self.config.save_option,
             "--save_data_path",
-            str(run_dir),
+            str(run_dir.resolve()),
             "--get_comment",
             "false",
             "--get_sub_comment",
@@ -174,7 +174,7 @@ class MediaCrawlerAdapter(SourceCollector):
             )
 
         try:
-            status = json.loads(status_path.read_text(encoding="utf-8"))
+            status = json.loads(status_path.read_text(encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError) as exc:
             return f"MediaCrawler initialization status is unreadable: {status_path} ({exc})."
 
@@ -358,6 +358,8 @@ def _run_command(cmd: list[str], *, cwd: str, timeout_seconds: int) -> subproces
         cmd,
         cwd=cwd,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         **popen_kwargs,

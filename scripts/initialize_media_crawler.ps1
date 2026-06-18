@@ -2,12 +2,13 @@ param(
     [string]$Target = "external/MediaCrawler",
     [string[]]$Platforms = @("xhs", "zhihu", "bilibili", "weibo", "tieba"),
     [string]$LoginType = "qrcode",
-    [string]$Keyword = "北京 旅游",
+    [string]$Keyword = "",
     [int]$Limit = 1,
     [int]$TimeoutSeconds = 300,
     [int]$CdpPort = 9222,
     [string]$InitStatePath = "data/media_crawler_init/status.json",
     [string]$InitRunsPath = "data/media_crawler_init/runs",
+    [switch]$StartCdpBrowser,
     [switch]$NoCdpBrowser
 )
 
@@ -106,6 +107,34 @@ function Invoke-Native {
     }
 }
 
+function ConvertTo-CommandLineArgument {
+    param([Parameter(Mandatory = $true)][string]$Value)
+
+    if ($Value -notmatch '[\s"]') {
+        return $Value
+    }
+
+    $escaped = $Value -replace '"', '\"'
+    return '"' + $escaped + '"'
+}
+
+function Get-JsonlRecordCount {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $docs = 0
+    Get-ChildItem -LiteralPath $Path -Recurse -Filter *.jsonl -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            $docs += @(Get-Content -LiteralPath $_.FullName -Encoding UTF8 -ErrorAction SilentlyContinue).Count
+        }
+    return $docs
+}
+
+function Stop-ProcessTree {
+    param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+    taskkill /PID $ProcessId /T /F | Out-Null
+}
+
 function Invoke-MediaCrawlerInitCheck {
     param(
         [Parameter(Mandatory = $true)][string]$MediaRoot,
@@ -133,22 +162,21 @@ function Invoke-MediaCrawlerInitCheck {
 
     $stdoutPath = Join-Path $RunPath "stdout.log"
     $stderrPath = Join-Path $RunPath "stderr.log"
-    $process = Start-Process -FilePath "uv" -ArgumentList $arguments -WorkingDirectory $MediaRoot -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+    $argumentLine = ($arguments | ForEach-Object { ConvertTo-CommandLineArgument -Value $_ }) -join " "
+    $process = Start-Process -FilePath "uv" -ArgumentList $argumentLine -WorkingDirectory $MediaRoot -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
     if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        Stop-ProcessTree -ProcessId $process.Id
+        $docs = Get-JsonlRecordCount -Path $RunPath
         return @{
             platform = $Platform
-            ok = $false
-            docs = 0
-            error = "MediaCrawler initialization timed out after $TimeoutSeconds seconds."
+            ok = ($docs -gt 0)
+            docs = $docs
+            error = if ($docs -gt 0) { $null } else { "MediaCrawler initialization timed out after $TimeoutSeconds seconds." }
         }
     }
 
-    $docs = 0
-    Get-ChildItem -LiteralPath $RunPath -Recurse -Filter *.jsonl -ErrorAction SilentlyContinue |
-        ForEach-Object {
-            $docs += @(Get-Content -LiteralPath $_.FullName -Encoding UTF8 -ErrorAction SilentlyContinue).Count
-        }
+    $process.Refresh()
+    $docs = Get-JsonlRecordCount -Path $RunPath
 
     $stderr = ""
     if (Test-Path -LiteralPath $stderrPath) {
@@ -157,15 +185,19 @@ function Invoke-MediaCrawlerInitCheck {
 
     return @{
         platform = $Platform
-        ok = ($process.ExitCode -eq 0 -and $docs -gt 0)
+        ok = ($docs -gt 0)
         docs = $docs
         exit_code = $process.ExitCode
-        error = if ($process.ExitCode -eq 0 -and $docs -gt 0) { $null } elseif ($stderr) { $stderr } else { "MediaCrawler completed but produced no jsonl records." }
+        error = if ($docs -gt 0) { $null } elseif ($stderr) { $stderr } else { "MediaCrawler completed but produced no jsonl records." }
     }
 }
 
 $root = Resolve-Path -LiteralPath "."
 $mediaRoot = Join-Path $root $Target
+
+if (-not $Keyword) {
+    $Keyword = -join @([char]0x5317, [char]0x4EAC, [char]0x65C5, [char]0x6E38)
+}
 
 & (Join-Path $root "scripts\setup_media_crawler.ps1") -Target $Target
 
@@ -177,9 +209,16 @@ if (-not (Test-Path -LiteralPath $mediaRoot)) {
     throw "MediaCrawler root does not exist after setup: $mediaRoot"
 }
 
-if (-not $NoCdpBrowser) {
+if (-not $NoCdpBrowser -and (Test-TcpPort -HostName "127.0.0.1" -Port $CdpPort)) {
+    Write-Host "Using existing CDP browser on port $CdpPort."
+} elseif ($StartCdpBrowser -and -not $NoCdpBrowser) {
     $cdpProfile = Join-Path $mediaRoot "browser_data\cdp_init_profile"
     Start-CdpBrowser -Port $CdpPort -ProfilePath $cdpProfile
+} elseif (-not $NoCdpBrowser) {
+    throw @"
+CDP browser is not running on port $CdpPort.
+Start Chrome or Edge yourself with --remote-debugging-port=$CdpPort, or rerun this script with -StartCdpBrowser to explicitly allow the script to launch a dedicated browser profile.
+"@
 }
 
 $initStateFullPath = Join-Path $root $InitStatePath
@@ -211,7 +250,9 @@ $state = [ordered]@{
     platform_results = $results
 }
 
-$state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $initStateFullPath -Encoding UTF8
+$statusJson = $state | ConvertTo-Json -Depth 5
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+[System.IO.File]::WriteAllText($initStateFullPath, $statusJson, $utf8NoBom)
 
 Write-Host "MediaCrawler initialization status written to $initStateFullPath"
 if (-not $state.initialized) {

@@ -44,6 +44,30 @@ def test_media_crawler_command_uses_real_cli_arguments(tmp_path: Path) -> None:
     assert command[command.index("--get_sub_comment") + 1] == "false"
 
 
+def test_media_crawler_command_uses_absolute_save_data_path(tmp_path: Path) -> None:
+    adapter = MediaCrawlerAdapter(
+        config=MediaCrawlerRunConfig(
+            root=tmp_path,
+            runner="uv run",
+            runs_path=Path("data/media_crawler_runs"),
+        ),
+        platforms=["xhs"],
+        request_id="req-relative",
+    )
+
+    command = adapter.build_command(
+        platform="xhs",
+        query="北京 攻略",
+        limit=1,
+        run_dir=Path("data/media_crawler_runs/req-relative"),
+    )
+
+    save_path = Path(command[command.index("--save_data_path") + 1])
+
+    assert save_path.is_absolute()
+    assert save_path.name == "req-relative"
+
+
 def test_media_crawler_output_parser_maps_jsonl_fields(tmp_path: Path) -> None:
     path = tmp_path / "xhs.jsonl"
     path.write_text(
@@ -127,4 +151,3 @@ out.mkdir(parents=True, exist_ok=True)
     assert docs[0].platform == "xhs"
     assert docs[0].query == "重庆 夜景"
     assert "夜景好看" in docs[0].content
-
