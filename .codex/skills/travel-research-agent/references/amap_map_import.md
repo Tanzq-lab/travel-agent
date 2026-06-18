@@ -9,19 +9,38 @@ Use this workflow when the user wants the travel result to live in Gaode Map rat
 - If the user wants route lines, use a route-specific Gaode template/tool if they provide one. Otherwise state that the user must create routes in Gaode with "制作路线" or an equivalent UI after marker import.
 - Put the actionable travel guidance into each marker's `描述` field so the map itself carries the plan.
 - Do not keep redundant Markdown/HTML guide documents when the user asks for a map-first deliverable.
+- Provide a concise companion note for map-first deliverables. It should explain import steps and evidence-based route decisions, not duplicate a long guide article.
+- Keep the final output directory user-facing. Remove or move intermediate CSV, JSON point plans, raw response JSON, sqlite/vector-store files, crawler scratch runs, screenshots, and other debug artifacts before the final answer unless the user asked for them.
 
 ## Preferred Artifact Set
 
 For a map-first travel output, produce:
 
 - A Gaode-compatible marker import workbook (`.xlsx`) generated from the user's template.
-- Optionally a same-schema CSV for review/debugging.
-- Optionally a route-order JSON for future automation or manual route creation.
+- A short companion note such as `导入说明与决策依据.txt` or `map_import_notes.md` covering import steps, route rationale, source confidence, pitfalls, weather/time tradeoffs, and known limitations.
+- Optionally a same-schema CSV for review/debugging, but keep it outside the final delivery directory or delete it before final response unless requested.
+- Optionally a route-order JSON for future automation or manual route creation, but keep it as scratch/debug output unless requested.
 
 Avoid producing:
 
 - Long Markdown/HTML guide documents unless the user explicitly asks for them.
 - Decorative cover images or route thumbnails unless the user explicitly asks for social-media style output.
+- A final directory cluttered with internal evidence dumps, raw workflow JSON, local databases, or vector stores.
+
+## Companion Decision Note
+
+For map-first outputs, the companion note should be concise but decision-complete. Include:
+
+- the exact workbook path and step-by-step import instructions
+- a clear statement that this import creates markers only, not route lines
+- the evidence corpus summary: platforms requested, platforms that succeeded, document counts if available, `collection_mode`, `llm_mode`, and collection errors
+- confidence by source/platform, especially when one requested platform failed, hit CAPTCHA, or only has initialization/sample data
+- why the selected day-by-day route was chosen over plausible alternatives
+- why backup or not-recommended points were not put in the main route
+- weather, train/flight times, lodging assumptions, and other hard constraints that changed the plan
+- concrete pitfalls from sources: rushed itineraries, long transfers, queue/booking risks, food/transport caveats, commercialized stops, and skip conditions
+
+Do not make the note a generic travel article. It should explain the map package and the choices encoded in the markers.
 
 ## Marker Workbook Fields
 
@@ -129,4 +148,6 @@ After generating the workbook:
 - Confirm the marker sheet dimension covers all generated rows.
 - Confirm row 1 contains the template headers.
 - Confirm point descriptions carry the itinerary guidance.
+- Confirm the companion decision note exists when the output is map-first.
+- Confirm the final delivery directory contains only user-facing files unless the user requested debug artifacts.
 - Tell the user clearly whether the output imports markers only or also creates routes.

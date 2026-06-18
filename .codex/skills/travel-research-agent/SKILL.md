@@ -1,6 +1,6 @@
 ---
 name: travel-research-agent
-description: Evidence-grounded travel research workflow bundled with this repository. Use when the user asks Codex to research whether a destination is worth visiting, generate a travel strategy, collect online travel notes with MediaCrawler, summarize pitfalls, compare suitability, or produce a report that must be grounded in collected sources rather than generic travel advice.
+description: Evidence-grounded travel research workflow bundled with this repository. Use when the user asks Codex to research whether a destination is worth visiting, generate a travel strategy, collect online travel notes with MediaCrawler, summarize pitfalls, compare suitability, produce a map-first itinerary/import package such as Gaode/Amap, or create any travel deliverable that must be grounded in collected sources rather than generic travel advice.
 ---
 
 # Travel Research Agent
@@ -59,8 +59,10 @@ For Gaode/Amap map outputs:
 - The Gaode map mini-program marker import template imports marked locations only. It does not automatically draw route lines or create "制作路线" resources. Make this limitation explicit.
 - For the standard Gaode marker template, write concise actionable guidance into each point's `描述` field: time slot, role in the route, next stop, skip/avoid advice, booking notes, and food/transport caveats.
 - Use ordered names such as `D1-01 ...`, `D2-01 ...` and hierarchical `文件夹` values to preserve itinerary order inside the map.
+- Always pair the marker workbook with a concise user-facing decision/rationale note, unless the user explicitly asks for the workbook only. This note is not a generic guide: it must explain how to import the workbook, why this route was chosen over plausible alternatives, which source themes support the choices, what pitfalls were found, how weather/time constraints changed the plan, and what confidence level each source/platform supports.
 - If the user needs actual route lines, ask for or use a route-specific template/tool. Otherwise provide the marker import file plus route order metadata, and state that route creation still requires Gaode's "制作路线" or equivalent UI.
-- Avoid keeping redundant guide documents when the map import file is the requested final deliverable.
+- Avoid keeping redundant Markdown/HTML guide documents when the map import file is the requested final deliverable. A short `.txt`/`.md` decision note is acceptable and expected for map-first outputs when it explains operation and evidence-based tradeoffs.
+- Keep the final delivery directory clean. Do not leave debug CSV, point-plan JSON, raw response JSON, sqlite databases, vector stores, crawler scratch folders, screenshots, or other intermediate files next to the user-facing artifact unless the user explicitly requests them. Store intermediate research artifacts under `data/` or a separate scratch path, or remove them before the final response.
 - Prefer `.codex/skills/travel-research-agent/scripts/build_amap_marker_workbook.py` for generating a marker import workbook from a JSON point plan and the user's Excel template.
 
 ## Output Expectations
@@ -70,12 +72,13 @@ Always surface the important result to the user:
 - collection mode and LLM mode
 - whether MediaCrawler failed for any platform/query
 - the final artifact path: Markdown/HTML report, map import workbook, route data, or another user-requested deliverable
+- for map/import deliverables, the path to the companion decision/rationale note and the fact that the final folder has been cleaned of intermediate files
 
 Only surface final judgement and score when MediaCrawler collection succeeded and produced usable source documents. If collection did not succeed, explicitly say no conclusion is provided because MediaCrawler research was not completed.
 
 If `llm_mode=fallback`, explicitly say evidence extraction used rule-based fallback because `OPENAI_API_KEY` was not configured.
 
-If collection errors are present, do not hide them. If usable MediaCrawler documents were still collected, mention that the report may be based on partial sources. If no usable MediaCrawler documents were collected, do not provide conclusions or recommendations.
+If collection errors are present, do not hide them. If usable MediaCrawler documents were still collected, mention that the report may be based on partial sources. For requested platforms that failed or produced only initialization/sample data, mark their confidence separately instead of implying full coverage. If no usable MediaCrawler documents were collected, do not provide conclusions or recommendations.
 
 If the error says MediaCrawler is not initialized, the correct next step is `.\scripts\initialize_media_crawler.ps1`; do not run platform login inside the research task.
 

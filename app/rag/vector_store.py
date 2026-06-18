@@ -60,7 +60,7 @@ class LocalVectorStore:
     def _load(self) -> None:
         if not self.path.exists():
             return
-        for line in self.path.read_text(encoding="utf-8").splitlines():
+        for line in self.path.read_text(encoding="utf-8-sig").splitlines():
             if not line.strip():
                 continue
             item = json.loads(line)
@@ -85,4 +85,3 @@ class LocalVectorStore:
             for record in self.records.values()
         ]
         self.path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
-

@@ -17,6 +17,7 @@ KNOWN_DESTINATIONS = [
     "南京",
     "苏州",
     "厦门",
+    "大连",
     "大理",
     "丽江",
     "三亚",
@@ -180,4 +181,3 @@ def _dedupe(values: list[str]) -> list[str]:
         seen.add(value)
         result.append(value)
     return result
-
