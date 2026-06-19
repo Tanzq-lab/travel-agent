@@ -1,6 +1,8 @@
 __pycache__/
 *.py[cod]
+.DS_Store
 .pytest_cache/
+.venv/
 .env
 .env.local
 data/*.sqlite3
@@ -8,3 +10,5 @@ data/vector_store/*.jsonl
 data/media_crawler_runs/
 data/media_crawler_init/
 external/MediaCrawler/
+external/.DS_Store
+external/*.zip
