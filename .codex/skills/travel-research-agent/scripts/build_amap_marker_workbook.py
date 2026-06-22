@@ -99,7 +99,12 @@ def find_marker_sheet(zip_file: ZipFile, sheet_name: str) -> str:
         target = rel_targets.get(rid or "")
         if not target:
             continue
-        normalized = "xl/" + target.lstrip("/")
+        if target.startswith("/"):
+            normalized = target.lstrip("/")
+        elif target.startswith("xl/"):
+            normalized = target
+        else:
+            normalized = "xl/" + target
         if first_sheet_target is None:
             first_sheet_target = normalized
         if sheet.attrib.get("name") == sheet_name:
