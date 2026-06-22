@@ -1,4 +1,4 @@
 interface:
   display_name: "Travel Research Agent"
-  short_description: "Collect travel evidence and build grounded reports or map packages"
-  default_prompt: "Use $travel-research-agent to research a destination with MediaCrawler evidence and generate a grounded travel report or map-first import package."
+  short_description: "Build cited travel plans and Gaode imports"
+  default_prompt: "Use $travel-research-agent to research a destination with MediaCrawler evidence and generate a cited, map-first Gaode import package."

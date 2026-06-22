@@ -37,3 +37,23 @@ Common failure causes:
 
 Do not bypass login, CAPTCHA, paywalls, or permission restrictions.
 
+## User-Supplied Platform Links
+
+When the user provides Xiaohongshu or other platform links as required evidence:
+
+- Treat them as part of the evidence corpus, not as optional examples.
+- Resolve shortlinks when needed and save link status under `data/processed/`, for example `*_link_status_YYYYMMDD.tsv`.
+- Use detail collection when available so the full note text, `note_id`, title, `note_url`, author metadata, and engagement counts are preserved.
+- If network is unstable, retry a small number of times and record which attempts failed or succeeded.
+- If a link cannot be opened, keep its original URL in the status file and mark it unavailable instead of silently dropping it.
+- When extracting recommendations, keep the source URL or `note_url` so final deliverables can cite it.
+
+## Evidence Hygiene
+
+- Save raw crawler JSONL under `data/media_crawler_runs/`.
+- Save processed summaries, point plans, link-status TSVs, and source maps under `data/processed/`.
+- Do not mix raw crawler output into final user-facing output folders.
+- If a source looks like an ad, low-information repost, or affiliate bait, downgrade confidence or exclude it from recommendations.
+- Prefer recommendations supported by multiple independent personal notes, cross-platform agreement, or official/current context.
+- For conflicting food reviews, preserve the disagreement and make the restaurant optional rather than mandatory.
+- For volatile event times such as fountains, fireworks, night shows, openings, or weather-dependent items, distinguish "sample evidence says" from "official/current source confirms".
